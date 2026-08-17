@@ -1,0 +1,6 @@
+{
+  "name": "Secure Password Vault Backup API",
+  "description": "Secure Password Vault Backup API implementation featuring client-side P-256 ECDSA authentication, PBKDF2/HKDF key derivation, AES-256-GCM encryption, replay protection, and .NET 10 codebase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
