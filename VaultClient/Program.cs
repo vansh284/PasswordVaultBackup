@@ -112,7 +112,7 @@ public class Program
         {
             new("github.com", "alice_dev", "P@ssw0rd_Github_99!", "2FA backup keys in safe"),
             new("bank.example.com", "alice.smith", "Correct-Horse-Battery-Staple$", "Checking + Savings"),
-            new("work-email.com", "alice@vault.com", "UltraSecureToken#2026", "Corporate login")
+            new("work-email.com", "alice@example.com", "UltraSecureToken#2026", "Corporate login")
         };
         string sampleVaultJson = JsonSerializer.Serialize(sampleVault, JsonOpts);
         Console.WriteLine($"Plaintext Vault JSON ({sampleVault.Count} entries):\n{sampleVaultJson}");

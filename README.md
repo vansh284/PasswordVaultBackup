@@ -1,6 +1,5 @@
 # Secure Password Vault Backup API
 
-**vault "Software Developer Take-Home Exercise"** — Secure Password Vault Backup API  
 **Target Platform & Framework:** .NET 10 / C# 14 Minimal APIs & Class Libraries + Web Protocol Summary
 
 ---
@@ -164,6 +163,5 @@ dotnet run
 
 ## 8. AI-Assistance Disclosure
 
-In accordance with vault's assessment guidelines:
-- **Architecture, Protocol Design, and Cryptographic Pipeline**: Formulated according to the take-home specification, using standard cryptographic primitives (NIST P-256, PBKDF2-HMAC-SHA256, HKDF-SHA256, AES-256-GCM).
+- **Architecture, Protocol Design, and Cryptographic Pipeline**: Formulated using standard cryptographic primitives (NIST P-256, PBKDF2-HMAC-SHA256, HKDF-SHA256, AES-256-GCM).
 - **Tooling Assistance**: Generative AI tools were utilized to assist in drafting boilerplate C# / .NET 10 class files, SQLite schemas, and documentation. All code, security constraints, and design decisions have been thoroughly reviewed for correctness and compliance.
