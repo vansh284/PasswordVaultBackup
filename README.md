@@ -131,12 +131,12 @@ As permitted by the take-home prompt, certain elements are simplified for clarit
 ## 6. Production Roadmap
 
 To scale this service to production:
-- **Argon2id Password Hashing**: Integrate Argon2id with memory cost 64MB, time cost 3, parallelism 4.
-- **Rate Limiting & Abuse Prevention**: IP and account rate limiting on /register and /verify via sliding window or token bucket (e.g. Redis) to prevent brute-force attacks.
 - **Token Expiration & Out-of-Band Delivery**: Store verification tokens with cryptographic hashes (SHA-256) and a 15-minute TTL; send via transactional email provider (SendGrid / AWS SES).
 - **Key Rotation**: Implement a re-encryption ceremony where the client derives a new keypair, requests the current vault under the old key, decrypts, re-encrypts under the new key, and updates the public key via a signed migration envelope.
 - **Horizontal Scaling & Database Clustering**: Replace SQLite with PostgreSQL / Spanner with optimistic concurrency control (xmin / row versioning) on LastNonce.
-- **Audit Logging**: Structured security telemetry tracking signature failures and nonce conflicts to detect active brute-force or replay attacks.
+- **Deterministic AES-GCM Nonces**: Replace random per-encryption nonces with a guaranteed-unique construction for each encryption key.
+- **Generic Client Errors**: Use less descriptive authentication and account errors to avoid leaking whether an account, token, or verification state exists; keep diagnostic details in protected server-side logs.
+- **TLS**: Serve the API only over HTTPS using TLS .
 
 ---
 
@@ -167,7 +167,7 @@ Step 2 generates a self-signed `localhost` certificate and trusts it in your OS 
 
 ## 8. AI-Assistance Disclosure
 
-- **Architecture & Protocol Design**: Designed from first principles using NIST P-256 ECDSA, PBKDF2-HMAC-SHA256, HKDF-SHA256, and AES-256-GCM for zero-knowledge security.
-- **Server-Side Code (C#/.NET 10)**: Drafted with AI assistance, then manually reviewed for cryptographic correctness, error handling, and security. Verified signature ordering (signature check before account state leaks) and replay protection logic.
-- **Client-Side Code (.NET Console)**: Manually written to implement the full 7-step authentication and encryption workflow with 4 negative test cases.
-- **Documentation**: Architecture sections written manually; AI assisted with boilerplate class comments and formatting.
+- **Architecture & Protocol Design**: Designed from principles and research for zero-knowledge security.
+- **Server-Side Code (C#/.NET 10)**: Drafted with AI assistance, then manually reviewed for cryptographic correctness, error handling, and security. 
+- **Client-Side Code (.NET Console)**: Conceived the authentication and encryption workflow with negative test cases, validated and extended with AI and code scaffolding with AI.
+- **Documentation**: Mostly AI generated.
