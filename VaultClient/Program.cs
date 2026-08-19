@@ -16,14 +16,11 @@ public class Program
     public static async Task Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8;
-        string baseUrl = args.Length > 0 ? args[0] : "http://localhost:5000";
+        string baseUrl = "https://localhost:5001";
 
-        // Allow bypassing self-signed dev cert for local testing if https is used
-        var handler = new HttpClientHandler
-        {
-            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-        };
-        using var http = new HttpClient(handler) { BaseAddress = new Uri(baseUrl) };
+        // Trust chain is satisfied by the ASP.NET Core dev cert (`dotnet dev-certs https --trust`);
+        // no custom validation callback needed.
+        using var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
 
         Console.WriteLine("================================================================================");
         Console.WriteLine("   SECURE PASSWORD VAULT BACKUP API — CLIENT WORKFLOW DEMONSTRATION");
@@ -36,25 +33,17 @@ public class Program
         Console.WriteLine($"User Email:           {email}");
         Console.WriteLine($"Master Password:      {masterPassword}\n");
 
-        // -----------------------------------------------------------------------------------------
-        // STEP 1: Generate key pair and symmetric encryption key deterministically from master password
-        // -----------------------------------------------------------------------------------------
         Console.WriteLine("--------------------------------------------------------------------------------");
         Console.WriteLine("STEP 1: Deterministic Key Derivation (PBKDF2-HMAC-SHA256 + HKDF-SHA256)");
         Console.WriteLine("--------------------------------------------------------------------------------");
-        var sw = Stopwatch.StartNew();
         var (signingKey, aesEncryptionKey) = KeyDerivation.DeriveKeys(email, masterPassword);
-        sw.Stop();
 
         string publicKeyPem = signingKey.ExportPublicKeyPem();
-        Console.WriteLine($"[+] PBKDF2 (600,000 iters) + HKDF completed in {sw.ElapsedMilliseconds} ms.");
+        Console.WriteLine($"[+] PBKDF2 (600,000 iters) + HKDF completed.");
         Console.WriteLine($"[+] AES-256 Key (Client Secret): {Convert.ToHexString(aesEncryptionKey)[..16]}... (32 bytes)");
         Console.WriteLine($"[+] ECDSA P-256 Public Key PEM:\n{publicKeyPem.Trim()}");
         Console.WriteLine();
 
-        // -----------------------------------------------------------------------------------------
-        // STEP 2: Register email and public key with server
-        // -----------------------------------------------------------------------------------------
         Console.WriteLine("--------------------------------------------------------------------------------");
         Console.WriteLine("STEP 2: Register Email Address and Public Key (POST /register)");
         Console.WriteLine("--------------------------------------------------------------------------------");
@@ -76,9 +65,6 @@ public class Program
         string verificationToken = regData!.VerificationToken;
         Console.WriteLine($"[+] Mocked Verification Token Received: {verificationToken}\n");
 
-        // -----------------------------------------------------------------------------------------
-        // STEP 3: Complete the mocked email-verification process
-        // -----------------------------------------------------------------------------------------
         Console.WriteLine("--------------------------------------------------------------------------------");
         Console.WriteLine("STEP 3: Verify Email with Signed Request (POST /verify)");
         Console.WriteLine("--------------------------------------------------------------------------------");
@@ -102,9 +88,6 @@ public class Program
         }
         Console.WriteLine("[+] Account successfully verified!\n");
 
-        // -----------------------------------------------------------------------------------------
-        // STEP 4: Encrypt a sample password vault client-side
-        // -----------------------------------------------------------------------------------------
         Console.WriteLine("--------------------------------------------------------------------------------");
         Console.WriteLine("STEP 4: Encrypt Sample Password Vault (AES-256-GCM)");
         Console.WriteLine("--------------------------------------------------------------------------------");
@@ -121,9 +104,6 @@ public class Program
         Console.WriteLine($"\n[+] Ciphertext [12B Nonce || 16B AuthTag || Ciphertext] (Base64):");
         Console.WriteLine($"    {encryptedBlob}\n");
 
-        // -----------------------------------------------------------------------------------------
-        // STEP 5: Store the encrypted vault
-        // -----------------------------------------------------------------------------------------
         Console.WriteLine("--------------------------------------------------------------------------------");
         Console.WriteLine("STEP 5: Store Encrypted Vault on Server (POST /store)");
         Console.WriteLine("--------------------------------------------------------------------------------");
@@ -137,9 +117,6 @@ public class Program
         Console.WriteLine($"Status Code: {(int)storeResponse.StatusCode} {storeResponse.StatusCode}");
         Console.WriteLine($"Response:    {storeBody}\n");
 
-        // -----------------------------------------------------------------------------------------
-        // STEP 6: Retrieve the encrypted vault
-        // -----------------------------------------------------------------------------------------
         Console.WriteLine("--------------------------------------------------------------------------------");
         Console.WriteLine("STEP 6: Retrieve Encrypted Vault from Server (POST /retrieve)");
         Console.WriteLine("--------------------------------------------------------------------------------");
@@ -155,9 +132,6 @@ public class Program
         var retrieveData = JsonSerializer.Deserialize<RetrieveResponse>(retrieveBody, JsonOpts);
         string retrievedBlob = retrieveData!.Vault;
 
-        // -----------------------------------------------------------------------------------------
-        // STEP 7: Confirm decrypted data matches stored data
-        // -----------------------------------------------------------------------------------------
         Console.WriteLine("--------------------------------------------------------------------------------");
         Console.WriteLine("STEP 7: Decrypt and Validate Integrity");
         Console.WriteLine("--------------------------------------------------------------------------------");
@@ -187,7 +161,6 @@ public class Program
         Console.WriteLine("   SECURITY & NEGATIVE TEST SUITE");
         Console.WriteLine("================================================================================");
 
-        // Negative Test 1: Replayed Nonce
         Console.WriteLine("\n[Test 1] Replay Attack: Resending identical previous store envelope...");
         var replayResponse = await http.PostAsJsonAsync("/store", storeEnvelope);
         string replayBody = await replayResponse.Content.ReadAsStringAsync();
@@ -195,7 +168,6 @@ public class Program
         Debug.Assert(replayResponse.StatusCode == HttpStatusCode.Conflict);
         Console.WriteLine(replayResponse.StatusCode == HttpStatusCode.Conflict ? "  -> PASS: Replay rejected with 409 Conflict." : "  -> FAIL!");
 
-        // Negative Test 2: Tampered Payload
         Console.WriteLine("\n[Test 2] Tamper Attack: Modifying 1 byte in payload without resigning...");
         await Task.Delay(10);
         var tamperedEnvelope = PayloadCodec.CreateSignedEnvelope(email, signingKey, storePayload);
@@ -209,7 +181,6 @@ public class Program
         Debug.Assert(tamperResponse.StatusCode == HttpStatusCode.BadRequest);
         Console.WriteLine(tamperResponse.StatusCode == HttpStatusCode.BadRequest ? "  -> PASS: Tampered payload rejected with 400 Bad Request." : "  -> FAIL!");
 
-        // Negative Test 3: Unauthorized Key Signature
         Console.WriteLine("\n[Test 3] Unauthorized Key: Signing request with an unauthorized keypair...");
         await Task.Delay(10);
         using var bogusKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -220,7 +191,6 @@ public class Program
         Debug.Assert(bogusResponse.StatusCode == HttpStatusCode.BadRequest);
         Console.WriteLine(bogusResponse.StatusCode == HttpStatusCode.BadRequest ? "  -> PASS: Invalid key signature rejected with 400 Bad Request." : "  -> FAIL!");
 
-        // Negative Test 4: Unverified Account Access
         Console.WriteLine("\n[Test 4] Unverified Account: Attempting store before verifying email...");
         string unverifiedEmail = $"bob_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}@example.com";
         var (bobKey, bobAes) = KeyDerivation.DeriveKeys(unverifiedEmail, "bob-secret-password");

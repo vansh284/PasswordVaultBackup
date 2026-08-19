@@ -1,3 +1,42 @@
+# .NET
+bin/
+obj/
+TestResults/
+artifacts/
+.vs/
+*.user
+*.suo
+*.rsuser
+*.userprefs
+*.sln.docstates
+*.db
+*.db-shm
+*.db-wal
+!*.db.example
+*.sln.cache
+*.userosx
+*.cache
+*.ilk
+*.pch
+*.aps
+*.ncb
+*.scc
+*.VSUser
+*.dbmdl
+*.dbproj
+*.jmd
+*.cache
+ipch/
+
+# Local code-review metadata and databases
+.code-review-graph/
+
+# Local signing keys and certificates
+*.pfx
+*.key
+*.pem
+
+# Node (generic JS build output)
 node_modules/
 build/
 dist/

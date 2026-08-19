@@ -27,6 +27,7 @@ public static class VaultCipher
 
         byte[] plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
         byte[] nonce = new byte[NonceSizeBytes];
+        // Extremely low probability of nonce collision with 96 bytes of randomness, to be extra safe, I would check for collisions in a database or use a counter-based nonce.
         RandomNumberGenerator.Fill(nonce);
 
         byte[] tag = new byte[TagSizeBytes];

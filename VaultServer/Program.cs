@@ -13,6 +13,9 @@ builder.Services.AddScoped<AuthValidator>();
 
 var app = builder.Build();
 
+// Redirect plaintext HTTP (port 5000, e.g. behind a proxy) to HTTPS (port 5001).
+app.UseHttpsRedirection();
+
 // Ensure SQLite schema is created on startup
 var dbContext = app.Services.GetRequiredService<VaultDbContext>();
 dbContext.InitializeDatabase();

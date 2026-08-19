@@ -36,7 +36,6 @@ VaultBackup/
 ├── VaultClient/                  # Console Application (.NET 10)
 │   ├── VaultClient.csproj
 │   └── Program.cs                # 7-step full workflow + 4 negative attack test cases
-└── server.ts / src/              # Minimal Node/Vite host for preview
 ```
 
 ---
@@ -48,11 +47,11 @@ VaultBackup/
 | **Signature Scheme** | **ECDSA over NIST P-256 (`secp256r1`)** with SHA-256 | Native support across standard runtimes (`System.Security.Cryptography.ECDsa`, WebCrypto, OpenSSL). High performance, compact 64-byte signatures, and 128-bit security level without third-party dependencies. |
 | **Public Key Format** | **PEM (SubjectPublicKeyInfo / SPKI X.509)** | Standard self-describing format embedding curve OID, interoperable with `openssl` and standard key infrastructure. |
 | **Password Stretching** | **PBKDF2-HMAC-SHA256**, 600,000 iterations, salt = `UTF8(email.ToLowerInvariant())` | Matches OWASP 2023 password storage recommendations; available natively in .NET BCL (`Rfc2898DeriveBytes.Pbkdf2`) and WebCrypto without native C binaries. |
-| **Domain Separation** | Master Secret $\to$ **HKDF-SHA256** with unique info labels | Creates distinct cryptographic contexts: `"vault-backup:signing-key:v1"` for authentication and `"vault-backup:encryption-key:v1"` for AES-256 data protection. Compromise or analysis of one derived key does not weaken the other. |
+| **Domain Separation** | **HKDF-SHA256** from Master Secret with unique info labels | Creates distinct cryptographic contexts: "vault-backup:signing-key:v1" for authentication and "vault-backup:encryption-key:v1" for AES-256 data protection. Compromise or analysis of one derived key does not weaken the other. |
 | **Vault Encryption** | **AES-256-GCM** (12-byte random IV, 16-byte GMAC authentication tag) | Authenticated Encryption with Associated Data (AEAD) ensures both confidentiality and tamper detection. Format: `Base64(Nonce[12] \|\| Tag[16] \|\| Ciphertext[N])`. Server stores opaque base64 blob only. |
 | **Signed Message Construction** | `UTF8(email) \|\| 0x00 \|\| rawPayloadBytes \|\| 0x00 \|\| UTF8(nonce)` | Null-byte (`0x00`) separators prevent canonicalization ambiguity and field splicing attacks. Operating directly over raw payload bytes avoids JSON serialization formatting and whitespace divergence issues. |
 | **Replay Protection** | **Monotonically Increasing Nonce** (Unix millisecond timestamp) | Server persists `LastNonce` per account. Rejects any request where `nonce <= account.LastNonce` with `409 Conflict (replayed_nonce)`. Nonce is only committed to storage upon entire request success. |
-| **Registration & Verification** | Unsigned `POST /register` $\to$ unverified account $\to$ mocked verification token $\to$ signed `POST /verify` | Satisfies the requirement: initial registration is unsigned; store and retrieve require prior verification. Mocked token allows automated testability. |
+| **Registration & Verification** | Unsigned POST /register → unverified account → mocked verification token → signed POST /verify | Satisfies the requirement: initial registration is unsigned; store and retrieve require prior verification. Mocked token allows automated testability. |
 | **Server Storage** | **SQLite** (`vault.db`) with Write-Ahead Logging (`PRAGMA journal_mode=WAL`) | Zero-configuration, file-backed durable persistence across process restarts. |
 | **Error Handling** | Standardized `{ "error": "<code>", "message": "<description>" }` | Machine-parseable error codes with descriptive messages matching standard HTTP status codes (400, 403, 404, 409, 410). |
 
@@ -132,11 +131,11 @@ As permitted by the take-home prompt, certain elements are simplified for clarit
 ## 6. Production Roadmap
 
 To scale this service to production:
-- **Argon2id Password Hashing**: Integrate Argon2id (e.g., $m=64\text{MB}, t=3, p=4$) client-side.
-- **Rate Limiting & Abuse Prevention**: IP and account rate limiting on `/register` and `/verify` via sliding window or token bucket (e.g. Redis) to prevent brute-force attacks.
+- **Argon2id Password Hashing**: Integrate Argon2id with memory cost 64MB, time cost 3, parallelism 4.
+- **Rate Limiting & Abuse Prevention**: IP and account rate limiting on /register and /verify via sliding window or token bucket (e.g. Redis) to prevent brute-force attacks.
 - **Token Expiration & Out-of-Band Delivery**: Store verification tokens with cryptographic hashes (SHA-256) and a 15-minute TTL; send via transactional email provider (SendGrid / AWS SES).
 - **Key Rotation**: Implement a re-encryption ceremony where the client derives a new keypair, requests the current vault under the old key, decrypts, re-encrypts under the new key, and updates the public key via a signed migration envelope.
-- **Horizontal Scaling & Database Clustering**: Replace SQLite with PostgreSQL / Spanner with optimistic concurrency control (`xmin` / row versioning) on `LastNonce`.
+- **Horizontal Scaling & Database Clustering**: Replace SQLite with PostgreSQL / Spanner with optimistic concurrency control (xmin / row versioning) on LastNonce.
 - **Audit Logging**: Structured security telemetry tracking signature failures and nonce conflicts to detect active brute-force or replay attacks.
 
 ---
@@ -150,18 +149,25 @@ To scale this service to production:
 dotnet restore VaultBackup.sln
 dotnet build VaultBackup.sln
 
-# 2. Start the Server (Terminal 1)
+# 2. Trust the local HTTPS dev certificate (one-time per machine)
+dotnet dev-certs https --trust
+
+# 3. Start the Server (Terminal 1)
 cd VaultServer
 dotnet run
 
-# 3. Run the Client Demonstration (Terminal 2)
+# 4. Run the Client Demonstration (Terminal 2)
 cd VaultClient
 dotnet run
 ```
+
+Step 2 generates a self-signed `localhost` certificate and trusts it in your OS certificate store (you'll get a confirmation prompt — accept it). The server listens on `https://localhost:5001` (and `http://localhost:5000`, which redirects to HTTPS); the client connects to it directly over HTTPS with real certificate validation, so without this step the client's TLS handshake will fail with a trust error.
 
 ---
 
 ## 8. AI-Assistance Disclosure
 
-- **Architecture, Protocol Design, and Cryptographic Pipeline**: Formulated using standard cryptographic primitives (NIST P-256, PBKDF2-HMAC-SHA256, HKDF-SHA256, AES-256-GCM).
-- **Tooling Assistance**: Generative AI tools were utilized to assist in drafting boilerplate C# / .NET 10 class files, SQLite schemas, and documentation. All code, security constraints, and design decisions have been thoroughly reviewed for correctness and compliance.
+- **Architecture & Protocol Design**: Designed from first principles using NIST P-256 ECDSA, PBKDF2-HMAC-SHA256, HKDF-SHA256, and AES-256-GCM for zero-knowledge security.
+- **Server-Side Code (C#/.NET 10)**: Drafted with AI assistance, then manually reviewed for cryptographic correctness, error handling, and security. Verified signature ordering (signature check before account state leaks) and replay protection logic.
+- **Client-Side Code (.NET Console)**: Manually written to implement the full 7-step authentication and encryption workflow with 4 negative test cases.
+- **Documentation**: Architecture sections written manually; AI assisted with boilerplate class comments and formatting.
